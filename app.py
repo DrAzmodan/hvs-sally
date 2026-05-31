@@ -164,7 +164,13 @@ def restaurar():
 # ── SERVIR EL FRONTEND ────────────────────────────────────
 @app.route('/')
 def index():
-    return send_from_directory('static', 'index.html')
+    import glob
+    static_dir = os.path.join(os.path.dirname(__file__), 'static')
+    html_files = glob.glob(os.path.join(static_dir, '*.html'))
+    if html_files:
+        filename = os.path.basename(html_files[0])
+        return send_from_directory('static', filename)
+    return "HVS Sally — index.html no encontrado en /static", 404
 
 @app.route('/<path:path>')
 def static_files(path):
