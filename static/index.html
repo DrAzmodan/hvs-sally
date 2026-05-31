@@ -2281,45 +2281,54 @@ let totalCarrito = 0;
 async function doLogin() {
   const u = document.getElementById('login-user').value.trim().toLowerCase();
   const p = document.getElementById('login-pass').value;
+  if (!u || !p) return;
 
-  // Intentar login en servidor primero
+  function entrarAlSistema() {
+    localStorage.setItem('hvs_session', JSON.stringify({user:u, ts:Date.now()}));
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').classList.add('visible');
+    document.getElementById('user-name-chip').textContent = u==='admin'?'Admin':'Dr. Valladares';
+    setTimeout(()=>{ cargarHoy(); actualizarArqueo(); }, 200);
+  }
+
+  function loginFallido() {
+    document.getElementById('login-error').style.display = 'block';
+    document.getElementById('login-pass').value = '';
+  }
+
+  // Intentar en servidor
   try {
     const resp = await fetch('/api/login', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({usuario:u, password:p})
     });
-    if (resp.ok) {
-      const data = await resp.json();
-      if (data.ok) {
-        localStorage.setItem('hvs_token', data.token);
-        localStorage.setItem('hvs_session', JSON.stringify({user:u, ts:Date.now()}));
-        document.getElementById('login-screen').style.display = 'none';
-        document.getElementById('app').classList.add('visible');
-        document.getElementById('user-name-chip').textContent = u==='admin'?'Admin':'Dr. Valladares';
-        // Cargar datos del servidor
-        await DB.cargarDelServidor();
-        cargarHoy(); actualizarArqueo();
-        return;
-      }
+    const data = await resp.json();
+    if (data.ok) {
+      localStorage.setItem('hvs_token', data.token);
+      entrarAlSistema();
+      // Cargar datos del servidor en background
+      DB.cargarDelServidor().catch(()=>{});
+      return;
+    } else {
+      loginFallido(); return;
     }
   } catch(e) {
-    // Sin servidor — modo offline con credenciales locales
-    console.log('Modo offline:', e.message);
+    console.log('Servidor no disponible, modo offline');
   }
 
-  // Fallback: credenciales locales (offline)
-  const users = DB.getObj('users');
-  const allUsers = Object.assign({}, CFG.users, users);
-  if (allUsers[u] && allUsers[u] === p) {
-    localStorage.setItem('hvs_session', JSON.stringify({user:u, ts:Date.now()}));
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('app').classList.add('visible');
-    document.getElementById('user-name-chip').textContent = u==='admin'?'Admin':'Dr. Valladares';
-    cargarHoy(); actualizarArqueo();
+  // Offline: credenciales hardcoded
+  const credsValidas = {
+    'hvs': 'sally2025',
+    'admin': 'hvs2025'
+  };
+  // Mezclar con contraseñas guardadas localmente
+  const savedUsers = JSON.parse(localStorage.getItem('hvs_usuarios') || '{}');
+  const allCreds = Object.assign({}, credsValidas, savedUsers);
+  if (allCreds[u] && allCreds[u] === p) {
+    entrarAlSistema();
   } else {
-    document.getElementById('login-error').style.display = 'block';
-    document.getElementById('login-pass').value = '';
+    loginFallido();
   }
 }
 
